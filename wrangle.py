@@ -4,10 +4,13 @@
 ##################################################Wrangle.py###################################################
 
 import pandas as pd
-
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import numpy as np
+from scipy import stats
+import sklearn.preprocessing
+import os
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 
@@ -22,13 +25,12 @@ def acquire_zillow():
     
     query = """
             
-    SELECT bedroomcnt, bathroomcnt, calculatedfinishedsquarefeet, taxvaluedollarcnt, yearbuilt, taxamount, fips
+    SELECT bedroomcnt, bathroomcnt, calculatedfinishedsquarefeet, taxvaluedollarcnt, yearbuilt, taxamount, fips, propertlandusedesc
     FROM properties_2017
 
     LEFT JOIN propertylandusetype USING(propertylandusetypeid)
 
-    WHERE propertylandusedesc IN ("Single Family Residential",                       
-                                  "Inferred Single Family Residential")"""
+    WHERE propertylandusetypeid = 261 or propertylandusetypeid = 279"""
 
     # get dataframe of data
     df = pd.read_sql(query, url)
@@ -160,12 +162,35 @@ def prepare_zillow(df):
     
     return train, validate, test    
 
-
+def scale(train, validate, test):
+    '''
+    Takes in a train, validate, test and returns the dataframes,
+    but scaled using the 'StandardScaler()'
+    '''
+    scale_cols = ['bedrooms',
+              'bathrooms',
+              'area',
+              'taxamount']
+    scaler = sklearn.preprocessing.StandardScaler()
+    scaler.fit(train[scale_cols])
+    train[scale_cols] = scaler.transform(train[scale_cols])
+    scaler.fit(validate[scale_cols])
+    validate[scale_cols] = scaler.transform(validate[scale_cols])
+    scaler.fit(test[scale_cols])
+    test[scale_cols] = scaler.transform(test[scale_cols])
+    return train, validate, test
 #**************************************************Wrangle*******************************************************
 
 
 def wrangle_zillow():
-    '''Acquire and prepare data from Zillow database for explore'''
-    train, validate, test = prepare_zillow(acquire_zillow())
+    '''
+    Function that acquires and prepares the zillow dataframe for use as well as creating a csv.
+    '''
+    if os.path.exists('zillow_cleaned.csv'):
+        zillow = pd.read_csv('zillow_cleaned.csv', index_col=0)
+        train, validate, test = prepare_zillow(df)
+        return train, validate, test
+    else:
+        train, validate, test = prepare_zillow(acquire_zillow())
     
-    return train, validate, test
+        return train, validate, test
